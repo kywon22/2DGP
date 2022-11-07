@@ -1,10 +1,13 @@
 from pico2d import *
-
+import game_world
+from ball import Ball
 
 #1 : 이벤트 정의
-RD, LD, RU, LU, TIMER = range(5)
+RD, LD, RU, LU, TIMER, SPACE = range(6)
+event_name = ['RD', 'LD', 'RU', 'LU', 'TIMER', 'SPACE']
 
 key_event_table = {
+    (SDL_KEYDOWN, SDLK_SPACE): SPACE,
     (SDL_KEYDOWN, SDLK_RIGHT): RD,
     (SDL_KEYDOWN, SDLK_LEFT): LD,
     (SDL_KEYUP, SDLK_RIGHT): RU,
@@ -21,8 +24,10 @@ class IDLE:
         self.timer = 1000
 
     @staticmethod
-    def exit(self):
+    def exit(self, event):
         print('EXIT IDLE')
+        if event == SPACE:
+            self.fire_ball()
 
     @staticmethod
     def do(self):
@@ -52,9 +57,11 @@ class RUN:
         elif event == LU:
             self.dir += 1
 
-    def exit(self):
+    def exit(self, event):
         print('EXIT RUN')
         self.face_dir = self.dir
+        if event == SPACE:
+            self.fire_ball()
 
     def do(self):
         self.frame = (self.frame + 1) % 8
@@ -74,7 +81,7 @@ class SLEEP:
         print('ENTER SLEEP')
         self.frame = 0
 
-    def exit(self):
+    def exit(self, event):
         pass
 
     def do(self):
@@ -92,9 +99,9 @@ class SLEEP:
 #3. 상태 변환 구현
 
 next_state = {
-    IDLE:  {RU: RUN,  LU: RUN,  RD: RUN,  LD: RUN, TIMER: SLEEP},
-    RUN:   {RU: IDLE, LU: IDLE, RD: IDLE, LD: IDLE},
-    SLEEP: {RU: RUN, LU: RUN, RD: RUN, LD: RUN}
+    IDLE:  {RU: RUN,  LU: RUN,  RD: RUN,  LD: RUN, TIMER: SLEEP, SPACE: IDLE},
+    RUN:   {RU: IDLE, LU: IDLE, RD: IDLE, LD: IDLE, SPACE: RUN},
+    SLEEP: {RU: RUN, LU: RUN, RD: RUN, LD: RUN, SPACE: SLEEP}
 }
 
 
@@ -103,7 +110,7 @@ next_state = {
 class Boy:
 
     def __init__(self):
-        self.x, self.y = 800 // 2, 90
+        self.x, self.y = 800 // 2, 50
         self.frame = 0
         self.dir, self.face_dir = 0, 1
         self.image = load_image('animation_sheet.png')
@@ -119,8 +126,13 @@ class Boy:
 
         if self.event_que:
             event = self.event_que.pop()
-            self.cur_state.exit(self)
-            self.cur_state = next_state[self.cur_state][event]
+            self.cur_state.exit(self, event)
+            try:
+                self.cur_state = next_state[self.cur_state][event]
+            except KeyError:
+                #어떤 상황에서 어떤 이벤트 때문에 문제가 발생했는지??
+                print('ERROR: ', self.cur_state, ' ', event_name[event])
+
             self.cur_state.enter(self, event)
 
     def draw(self):
@@ -136,3 +148,7 @@ class Boy:
             key_event = key_event_table[(event.type, event.key)]
             self.add_event(key_event)
 
+    def fire_ball(self):
+        print('FIRE BALL')
+        ball = Ball(self.x, self.y, self.face_dir*2)
+        game_world.add_object(ball, 1)
